@@ -6,11 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.*;
+import java.util.Base64;
 import java.util.HashMap;
-import java.util.logging.Logger;
-
-import javax.imageio.ImageIO;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 import edu.escuelaing.arep.app1.ServerCache;
@@ -41,6 +38,7 @@ public class HttpServer {
             String inputLine, outputLine;
             boolean firstLine = true;
             String uriString = "";
+            ServerCache cache = new ServerCache();
 
             while ((inputLine = in.readLine()) != null) {
                 if (inputLine.contains("hello?name=")) {
@@ -52,13 +50,8 @@ public class HttpServer {
                     break;
                 }
             }
-            if (uriString.startsWith("/hello?")) {
-                outputLine = getIndexResponse();
-            }else {
-                outputLine = getText();
-                
-            }
 
+            outputLine= getText(getImageResponse());
             out.println(outputLine);
             out.close();
             in.close();
@@ -67,9 +60,7 @@ public class HttpServer {
         serverSocket.close();
     }
 
-
-
-        public static String getText() {
+    public static String getText(String image) {
         String response;
         try {
             Path indexPath = Paths.get("src/main/resources/index.html");
@@ -79,7 +70,9 @@ public class HttpServer {
             response = "HTTP/1.1 200 OK\r\n"
                     + "Content-Type: text/html\r\n"
                     + "\r\n"
-                    + indexContent;
+                    + indexContent
+                    + "        <img src=\"data:image/jpeg;base64," + image + "\" alt=\"Image\">\n";
+                    
         } catch (IOException e) {
             System.err.format("IOException: %s%n", e);
             response = "HTTP/1.1 500 Internal Server Error\r\n"
@@ -100,30 +93,48 @@ public class HttpServer {
         return response;
     }
 
-    
-
-    public static String getJPG(PrintWriter out, OutputStream clientOutputStream) {
-        String response= "";
-        Path imagePath = Paths.get("src/main/resources/image.jpg");
-        try (InputStream infile = Files.newInputStream(imagePath)) {
-            Long size = Files.size(imagePath);
-            response = "HTTP/1.1 200 OK\r\n"
-            + "Content-Type: image/jpg\r\n"
-            + "\r\n";
-
-            out.print(response);
-
-            byte[] buf = new byte[1024];
-            int numeroBytes;
-            while ((numeroBytes = infile.read(buf)) != -1) {
-                clientOutputStream.write(buf, 0, numeroBytes);
-            }
+    public static byte[] getImageBytes() {
+        try {
+            Path imagePath = Paths.get("src/main/resources/image.jpeg");
+            byte[] imageBytes = Files.readAllBytes(imagePath);
+            return imageBytes;
         } catch (IOException e) {
             System.err.format("IOException: %s%n", e);
+            return null;
         }
-        return response;
     }
 
+    public static String getImageResponse() {
+        byte[] imageBytes = getImageBytes();
+        if (imageBytes != null) {
+            String imageData = Base64.getEncoder().encodeToString(imageBytes);
+            return imageData;
+        } else {
+            return "HTTP/1.1 500 Internal Server Error\r\n"
+                    + "Content-Type: text/html\r\n"
+                    + "\r\n";
+        }
+    }
+
+    public static String getCssResponse() {
+        String response;
+        try {
+            Path cssPath = Paths.get("src/main/resources/style.css");
+            byte[] cssBytes = Files.readAllBytes(cssPath);
+            String cssContent = new String(cssBytes, StandardCharsets.UTF_8);
+
+            response = "HTTP/1.1 200 OK\r\n"
+                    + "Content-Type: text/css\r\n"
+                    + "\r\n"
+                    + cssContent;
+        } catch (IOException e) {
+            response = "HTTP/1.1 500 Internal Server Error\r\n"
+                    + "Content-Type: text/css\r\n"
+                    + "\r\n";
+        }
+
+        return response;
+    }
 
     private static String data(String answer) {
         HashMap<String, String> hash = new HashMap<String, String>();
